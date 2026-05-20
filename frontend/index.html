@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VLite</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <aside class="sidebar" id="sidebar">
+        <div class="side-top">
+          <button class="icon-btn bright" id="newChatBtn" title="New chat">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+        </div>
+        <button class="wide-btn" id="settingsBtn">
+          <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.06.06a2.1 2.1 0 0 1-2.97 2.97l-.06-.06a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.66V21.4a2.1 2.1 0 0 1-4.2 0v-.09a1.8 1.8 0 0 0-1.1-1.66 1.8 1.8 0 0 0-1.98.36l-.06.06a2.1 2.1 0 1 1-2.97-2.97l.06-.06A1.8 1.8 0 0 0 3.8 15a1.8 1.8 0 0 0-1.66-1.1H2.05a2.1 2.1 0 0 1 0-4.2h.09A1.8 1.8 0 0 0 3.8 8.6a1.8 1.8 0 0 0-.36-1.98l-.06-.06a2.1 2.1 0 1 1 2.97-2.97l.06.06A1.8 1.8 0 0 0 8.4 4a1.8 1.8 0 0 0 1.1-1.66v-.09a2.1 2.1 0 0 1 4.2 0v.09A1.8 1.8 0 0 0 14.8 4a1.8 1.8 0 0 0 1.98-.36l.06-.06a2.1 2.1 0 1 1 2.97 2.97l-.06.06A1.8 1.8 0 0 0 19.4 8.6a1.8 1.8 0 0 0 1.66 1.1h.09a2.1 2.1 0 0 1 0 4.2h-.09A1.8 1.8 0 0 0 19.4 15Z"/></svg>
+          Settings
+        </button>
+        <div class="history-label">Chats</div>
+        <div class="chat-list" id="chatList"></div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <button class="icon-btn" id="toggleSidebarBtn" title="Toggle sidebar">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <div class="model-strip">
+            <select id="modelSelect"></select>
+            <span class="status-pill" id="engineStatus">No model loaded</span>
+            <button class="mini-btn" id="loadTextBtn">Load Text</button>
+            <button class="mini-btn" id="loadVisionBtn">Load Vision</button>
+            <button class="mini-btn danger" id="unloadBtn">Unload</button>
+          </div>
+        </header>
+
+        <section class="chat-surface" id="chatSurface">
+          <div class="neural-grid"></div>
+          <div class="empty-state" id="emptyState"></div>
+          <div class="messages" id="messages"></div>
+        </section>
+
+        <footer class="composer-wrap">
+          <div class="context-row">
+            <span id="contextLabel">0 tokens</span>
+            <div class="context-bar"><span id="contextFill"></span></div>
+          </div>
+          <div class="uploads" id="uploads"></div>
+          <div class="composer">
+            <button class="round-btn" id="uploadBtn" title="Upload files">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+            </button>
+            <button class="round-btn" id="webBtn" title="Use web and URLs">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+            </button>
+            <textarea id="promptInput" rows="1" placeholder="Send a message"></textarea>
+            <button class="round-btn send" id="sendBtn" title="Send">
+              <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+            </button>
+          </div>
+          <div class="notice" id="notice"></div>
+        </footer>
+      </main>
+    </div>
+
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+    <section class="settings-drawer" id="settingsDrawer">
+      <div class="drawer-head">
+        <div>
+          <h2>Settings</h2>
+          <p>Model runtime, generation, and offline behavior.</p>
+        </div>
+        <button class="icon-btn" id="closeSettingsBtn" title="Close settings">
+          <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div class="settings-scroll">
+        <section class="panel">
+          <h3>Model Folders</h3>
+          <div class="inline-actions">
+            <button class="mini-btn" id="addFolderBtn">Add Folder</button>
+            <button class="mini-btn" id="rescanBtn">Rescan</button>
+          </div>
+          <div class="folder-list" id="folderList"></div>
+          <label>llama-server.exe path
+            <input id="serverPathInput" placeholder="bin\\llama-server.exe or VLITE_LLAMA_SERVER" />
+          </label>
+        </section>
+
+        <section class="panel two-col">
+          <h3>Load Options</h3>
+          <label>Context length<input type="number" id="ctxSizeInput" min="512" step="512" /></label>
+          <label>GPU layers<input type="number" id="gpuLayersInput" step="1" /></label>
+          <label>Batch<input type="number" id="batchInput" min="1" /></label>
+          <label>Micro batch<input type="number" id="ubatchInput" min="1" /></label>
+          <label>Threads<input type="number" id="threadsInput" min="0" /></label>
+          <label>Split mode
+            <select id="splitModeInput"><option>layer</option><option>row</option><option>none</option></select>
+          </label>
+          <label>K cache type<input id="typeKInput" placeholder="f16, q8_0..." /></label>
+          <label>V cache type<input id="typeVInput" placeholder="f16, q8_0..." /></label>
+          <label class="check"><input type="checkbox" id="flashInput" /> Flash attention</label>
+          <label class="check"><input type="checkbox" id="mmapInput" /> Use mmap</label>
+          <label class="check"><input type="checkbox" id="mlockInput" /> Use mlock</label>
+          <label class="check"><input type="checkbox" id="cachePromptInput" /> Cache prompt</label>
+          <label class="check"><input type="checkbox" id="noWarmupInput" /> No warmup</label>
+          <label class="check"><input type="checkbox" id="mmprojOffloadInput" /> MMProj offload</label>
+          <label class="wide">Chat template<input id="chatTemplateInput" /></label>
+          <label class="wide">Chat template kwargs<input id="templateKwargsInput" placeholder='{"enable_thinking":false}' /></label>
+          <label>Reasoning
+            <select id="reasoningInput"><option>auto</option><option>on</option><option>off</option></select>
+          </label>
+          <label>Reasoning budget<input type="number" id="reasoningBudgetInput" step="1" /></label>
+          <label>Reasoning format<input id="reasoningFormatInput" placeholder="auto" /></label>
+          <label class="wide">Extra llama-server flags<input id="extraFlagsInput" placeholder="validated before launch" /></label>
+        </section>
+
+        <section class="panel two-col">
+          <h3>Generation</h3>
+          <label>Max tokens<input type="number" id="maxTokensInput" min="1" /></label>
+          <label>Temperature<input type="number" id="temperatureInput" min="0" max="2" step="0.05" /></label>
+          <label>Top P<input type="number" id="topPInput" min="0" max="1" step="0.01" /></label>
+          <label>Top K<input type="number" id="topKInput" min="0" step="1" /></label>
+          <label>Min P<input type="number" id="minPInput" min="0" max="1" step="0.01" /></label>
+          <label>Typical P<input type="number" id="typicalPInput" min="0" max="1" step="0.01" /></label>
+          <label>Repeat penalty<input type="number" id="repeatPenaltyInput" min="0" step="0.05" /></label>
+          <label>Presence penalty<input type="number" id="presencePenaltyInput" step="0.05" /></label>
+          <label>Frequency penalty<input type="number" id="frequencyPenaltyInput" step="0.05" /></label>
+          <label>Mirostat<input type="number" id="mirostatInput" min="0" max="2" step="1" /></label>
+          <label class="wide">Stop sequences<textarea id="stopInput" rows="3"></textarea></label>
+          <label class="check"><input type="checkbox" id="thinkingInput" /> Thinking enabled</label>
+          <label class="check"><input type="checkbox" id="showThinkingInput" /> Show thinking</label>
+        </section>
+      </div>
+      <div class="drawer-foot">
+        <button class="mini-btn bright" id="saveSettingsBtn">Save Settings</button>
+      </div>
+    </section>
+
+    <script src="app.js"></script>
+  </body>
+</html>
