@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+build/
+dist/
+*.spec
+*.log
+
+# Runtime binaries are supplied locally for packaging.
+bin/*.exe
+bin/*.dll
+!bin/README.md
+
+# User-local state and model files.
+*.gguf
+*.safetensors
+*.bin
+*.onnx
