@@ -21,6 +21,8 @@ except Exception:
 
 
 class VLiteAPI:
+    MAX_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024
+
     def __init__(self, app_root: Path):
         self.app_root = Path(app_root)
         self.window = None
@@ -34,6 +36,7 @@ class VLiteAPI:
         self._frontend_ready = False
         self._streams: dict[str, dict] = {}
         self._streams_lock = threading.Lock()
+        self._allowed_upload_paths: set[str] = set()
 
     def set_window(self, window):
         self.window = window
@@ -148,6 +151,7 @@ class VLiteAPI:
         paths = self._pick_files()
         if not paths:
             return {"cancelled": True}
+        self._allowed_upload_paths = {str(Path(path).resolve(strict=True)) for path in paths}
         chat = self.storage.get_chat()
         if not chat:
             chat = self.storage.create_chat("New Chat")
@@ -155,11 +159,13 @@ class VLiteAPI:
         errors = []
         for path in paths:
             try:
+                safe_path = self._validate_upload_path(path)
+                safe_path_str = str(safe_path)
                 mime = mimetypes.guess_type(path)[0] or ""
-                if mime.startswith("image/") or Path(path).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}:
-                    uploads.append(self._image_upload(path, mime))
+                if mime.startswith("image/") or safe_path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}:
+                    uploads.append(self._image_upload(safe_path_str, mime))
                 else:
-                    uploads.append(self.documents.process(path))
+                    uploads.append(self.documents.process(safe_path_str))
             except Exception as exc:
                 errors.append(f"{Path(path).name}: {exc}")
         chat["uploads"] = uploads
@@ -328,16 +334,31 @@ class VLiteAPI:
         return messages
 
     def _image_upload(self, path: str, mime: str) -> dict:
-        data = Path(path).read_bytes()
+        safe_path = self._validate_upload_path(path)
+        size = safe_path.stat().st_size
+        if size > self.MAX_IMAGE_UPLOAD_BYTES:
+            raise ValueError("Image upload is too large.")
+        data = safe_path.read_bytes()
         encoded = base64.b64encode(data).decode("ascii")
         return {
-            "name": Path(path).name,
-            "path": path,
+            "name": safe_path.name,
+            "path": str(safe_path),
             "kind": "image",
             "mime": mime or "image/png",
             "data_url": f"data:{mime or 'image/png'};base64,{encoded}",
             "tokens": 0,
         }
+
+    def _validate_upload_path(self, path: str) -> Path:
+        try:
+            resolved = Path(path).resolve(strict=True)
+        except Exception as exc:
+            raise ValueError("Selected file is unavailable.") from exc
+        if not resolved.is_file():
+            raise ValueError("Selected upload is not a file.")
+        if str(resolved) not in self._allowed_upload_paths:
+            raise ValueError("Rejected file path that was not selected in the file picker.")
+        return resolved
 
     def _find_model(self, model_id: str) -> dict | None:
         for model in self.models:

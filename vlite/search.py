@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import html as html_lib
+import ipaddress
 import json
 import random
 import re
+import socket
 import time
 import urllib.parse
 import urllib.request
@@ -16,6 +18,7 @@ except Exception:
 
 
 URL_RE = re.compile(r"https?://[^\s)>\]\"']+", re.IGNORECASE)
+MAX_FETCH_BYTES = 1_000_000
 
 
 def _strip_tags(html: str) -> str:
@@ -32,6 +35,37 @@ class SearchService:
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
     ]
+
+    class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            SearchService._validate_public_http_url(newurl)
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+    def _open_public_url(self, request, timeout: int):
+        opener = urllib.request.build_opener(self._SafeRedirectHandler)
+        return opener.open(request, timeout=timeout)
+
+    @staticmethod
+    def _validate_public_http_url(url: str) -> urllib.parse.ParseResult:
+        parsed = urllib.parse.urlparse(url or "")
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(f"Rejected URL scheme: {parsed.scheme or 'missing'}")
+        if parsed.username or parsed.password:
+            raise ValueError("Rejected URL with embedded credentials.")
+        host = parsed.hostname
+        if not host:
+            raise ValueError("Rejected URL without a host.")
+        if host.lower() in {"localhost", "localhost.localdomain"}:
+            raise ValueError("Rejected local host URL.")
+        try:
+            addresses = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)
+        except socket.gaierror as exc:
+            raise ValueError(f"Could not resolve URL host: {exc}") from exc
+        for item in addresses:
+            ip = ipaddress.ip_address(item[4][0])
+            if not ip.is_global:
+                raise ValueError(f"Rejected non-public URL host: {host}")
+        return parsed
 
     def read_urls_from_text(self, text: str, max_chars: int = 6000) -> str:
         sections = []
@@ -116,8 +150,9 @@ class SearchService:
         encoded = urllib.parse.quote(location)
         url = f"https://wttr.in/{encoded}?format=j1"
         try:
+            self._validate_public_http_url(url)
             req = urllib.request.Request(url, headers={"User-Agent": random.choice(self.USER_AGENTS)})
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with self._open_public_url(req, timeout=10) as response:
                 data = json.loads(response.read().decode("utf-8", "replace"))
             current = (data.get("current_condition") or [{}])[0]
             area = ((data.get("nearest_area") or [{}])[0].get("areaName") or [{}])[0].get("value") or location
@@ -224,7 +259,8 @@ class SearchService:
             data=payload,
             headers={"Content-Type": "application/json", "User-Agent": random.choice(self.USER_AGENTS)},
         )
-        with urllib.request.urlopen(request, timeout=20) as response:
+        self._validate_public_http_url(request.full_url)
+        with self._open_public_url(request, timeout=20) as response:
             data = json.loads(response.read().decode("utf-8"))
         return [
             {"title": item.get("title", "Search Result"), "url": item.get("url", ""), "content": item.get("content", "")}
@@ -244,7 +280,8 @@ class SearchService:
                         "Content-Type": "application/x-www-form-urlencoded",
                     },
                 )
-                with urllib.request.urlopen(request, timeout=20) as response:
+                self._validate_public_http_url(request.full_url)
+                with self._open_public_url(request, timeout=20) as response:
                     page = response.read().decode("utf-8", errors="ignore")
                 results = self._parse_duckduckgo_html(page, limit=limit)
                 time.sleep(0.2)
@@ -319,14 +356,16 @@ class SearchService:
         return url
 
     def read_url(self, url: str, max_chars: int = 4000) -> str:
-        parsed = urllib.parse.urlparse(url or "")
-        if parsed.scheme not in ("http", "https"):
-            return f"Rejected: read_url only accepts http/https URLs, got '{parsed.scheme}'."
+        try:
+            parsed = self._validate_public_http_url(url)
+        except ValueError as exc:
+            return f"Rejected: {exc}"
         try:
             request = urllib.request.Request(url, headers={"User-Agent": random.choice(self.USER_AGENTS)})
-            with urllib.request.urlopen(request, timeout=20) as response:
+            with self._open_public_url(request, timeout=20) as response:
+                self._validate_public_http_url(response.geturl())
                 content_type = response.headers.get("content-type", "")
-                raw = response.read(max_chars * 5)
+                raw = response.read(min(MAX_FETCH_BYTES, max_chars * 5))
             if "application/json" in content_type:
                 text = json.dumps(json.loads(raw.decode("utf-8", "replace")), indent=2)
             else:
