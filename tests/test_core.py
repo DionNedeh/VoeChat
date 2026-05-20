@@ -126,6 +126,17 @@ class ServerRuntimeTests(unittest.TestCase):
 
 
 class SearchTests(unittest.TestCase):
+    def test_rejects_private_url_targets(self):
+        service = SearchService()
+        self.assertIn("Rejected", service.read_url("http://127.0.0.1/admin"))
+        self.assertIn("Rejected", service.read_url("http://169.254.169.254/latest/meta-data"))
+        with self.assertRaises(ValueError):
+            service._validate_public_http_url("http://10.0.0.5/internal")
+
+    def test_allows_public_http_targets(self):
+        parsed = SearchService._validate_public_http_url("https://93.184.216.34/")
+        self.assertEqual(parsed.scheme, "https")
+
     def test_weather_location_extraction(self):
         self.assertEqual(SearchService._weather_location("Can you search Polkville NC weather?"), "Polkville NC")
         self.assertEqual(SearchService._weather_location("Can you search Shelby NC weather for me and give me the forecast?"), "Shelby NC")
@@ -204,6 +215,17 @@ class ApiTests(unittest.TestCase):
         system = api._build_messages(chat, "latest news", web_enabled=False)[0]["content"]
         self.assertNotIn("Web/search tools are enabled", system)
 
+    def test_image_upload_requires_file_picker_allowlist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "image.png"
+            path.write_bytes(b"png")
+            api = VLiteAPI(Path.cwd())
+            with self.assertRaises(ValueError):
+                api._image_upload(str(path), "image/png")
+            api._allowed_upload_paths = {str(path.resolve())}
+            result = api._image_upload(str(path), "image/png")
+            self.assertEqual(result["name"], "image.png")
+
 
 class StorageTests(unittest.TestCase):
     def test_storage_round_trip(self):
@@ -236,6 +258,18 @@ class DocumentTests(unittest.TestCase):
                 archive.writestr("word/document.xml", xml)
             result = DocumentService().process(str(path))
             self.assertEqual(result["text"], "Hello DOCX")
+
+    def test_rejects_oversized_uploads_before_parsing(self):
+        original = DocumentService.MAX_UPLOAD_BYTES
+        DocumentService.MAX_UPLOAD_BYTES = 3
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "large.txt"
+                path.write_text("too large", encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    DocumentService().process(str(path))
+        finally:
+            DocumentService.MAX_UPLOAD_BYTES = original
 
 
 class ContextTests(unittest.TestCase):
