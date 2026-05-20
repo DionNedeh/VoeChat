@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import zipfile
 import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as DefusedET
 from pathlib import Path
 
 
@@ -81,7 +82,7 @@ class DocumentService:
 
         with zipfile.ZipFile(path) as archive:
             xml = archive.read("word/document.xml")
-        root = ET.fromstring(xml)
+        root = DefusedET.fromstring(xml)
         ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
         paragraphs = []
         for paragraph in root.findall(".//w:p", ns):
