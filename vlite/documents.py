@@ -4,10 +4,7 @@ import os
 import zipfile
 from pathlib import Path
 
-try:
-    import defusedxml.ElementTree as SafeET
-except Exception:
-    import xml.etree.ElementTree as SafeET
+from defusedxml.ElementTree import fromstring as parse_xml_document
 
 
 class DocumentService:
@@ -112,7 +109,7 @@ class DocumentService:
             xml = archive.read("word/document.xml")
         if len(xml) > DocumentService.MAX_EXTRACTED_CHARS:
             raise ValueError("DOCX document XML is too large.")
-        root = SafeET.fromstring(xml)
+        root = parse_xml_document(xml)
         ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
         paragraphs = []
         for paragraph in root.findall(".//w:p", ns):

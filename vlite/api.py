@@ -113,10 +113,12 @@ class VLiteAPI:
         if not path:
             return {"success": False, "cancelled": True}
         try:
-            Path(path).write_text(self._chat_export_text(chat), encoding="utf-8")
+            export_path = self._validate_export_path(path)
+            with export_path.open("w", encoding="utf-8") as handle:
+                handle.write(self._chat_export_text(chat))
         except Exception as exc:
             return {"success": False, "error": f"Could not export chat: {exc}"}
-        return {"success": True, "path": str(path)}
+        return {"success": True, "path": str(export_path)}
 
     def toggle_fullscreen(self):
         if not self.window:
@@ -458,6 +460,22 @@ class VLiteAPI:
         if isinstance(result, (list, tuple)):
             return result[0] if result else ""
         return result or ""
+
+    @staticmethod
+    def _validate_export_path(path: str) -> Path:
+        if not path:
+            raise ValueError("No export path was selected.")
+        candidate = Path(path).expanduser()
+        if not candidate.is_absolute():
+            raise ValueError("Export path must be absolute.")
+        parent = candidate.parent.resolve(strict=True)
+        home = Path.home().resolve(strict=True)
+        if not parent.is_relative_to(home):
+            raise ValueError("Export path must stay inside your user profile.")
+        if not parent.is_dir():
+            raise ValueError("Export destination is not a directory.")
+        filename = VLiteAPI._safe_export_name(candidate.stem) + ".txt"
+        return parent / filename
 
     @staticmethod
     def _safe_export_name(title: str) -> str:
