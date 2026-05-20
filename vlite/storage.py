@@ -21,7 +21,7 @@ class StorageService:
         self.upload_dir.mkdir(exist_ok=True)
 
     def read_json(self, name: str, default: Any) -> Any:
-        path = self.root / name
+        path = self._data_file(name)
         if not path.exists():
             return default
         try:
@@ -30,12 +30,23 @@ class StorageService:
             return default
 
     def write_json(self, name: str, payload: Any) -> Any:
-        path = self.root / name
+        path = self._data_file(name)
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        with tmp.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
         tmp.replace(path)
         return payload
+
+    def _data_file(self, name: str) -> Path:
+        candidate = Path(name)
+        if candidate.is_absolute() or len(candidate.parts) != 1 or candidate.name != name:
+            raise ValueError("Storage file name must be a simple file name.")
+        resolved = (self.root / candidate.name).resolve()
+        root = self.root.resolve()
+        if not resolved.is_relative_to(root):
+            raise ValueError("Storage file path escaped the data directory.")
+        return resolved
 
     def settings(self) -> dict:
         defaults = {

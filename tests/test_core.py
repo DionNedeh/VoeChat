@@ -188,6 +188,14 @@ class ApiTests(unittest.TestCase):
         self.assertIn("USER:\nhello", text)
         self.assertIn("ASSISTANT:\nhi there", text)
 
+    def test_export_path_stays_inside_user_profile(self):
+        home_export = Path.home() / "unsafe<>name.md"
+        safe_path = VLiteAPI._validate_export_path(str(home_export))
+        self.assertEqual(safe_path.suffix, ".txt")
+        self.assertTrue(safe_path.parent.resolve().is_relative_to(Path.home().resolve()))
+        with self.assertRaises(ValueError):
+            VLiteAPI._validate_export_path("relative.txt")
+
     def test_web_enabled_prompt_injects_search_context(self):
         api = VLiteAPI(Path.cwd())
 
@@ -237,6 +245,12 @@ class StorageTests(unittest.TestCase):
             chat["messages"].append({"role": "user", "content": "hello"})
             storage.save_chat(chat)
             self.assertEqual(storage.get_chat(chat["id"])["messages"][0]["content"], "hello")
+
+    def test_storage_rejects_path_traversal_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            storage = StorageService(root=tmp)
+            with self.assertRaises(ValueError):
+                storage.write_json("../escape.json", {"bad": True})
 
 
 class DocumentTests(unittest.TestCase):
