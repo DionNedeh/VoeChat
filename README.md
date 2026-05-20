@@ -42,7 +42,7 @@ Model files are not bundled. VoeChat scans common local model folders and lets u
 
 The source repo does not include the full CUDA llama.cpp runtime because some vendor DLLs exceed GitHub's normal file-size limits. Keep the local `bin\` folder for packaging, or download a matching llama.cpp Windows build and place the server/runtime files there before running from source.
 
-## Patch Notes
+## Patch Notes v1.5.0
 
 - Fixed SSRF risk in web/search URL fetching by blocking private, localhost, metadata, and non-public redirect targets.
 - Hardened file upload handling so image reads must come from picker-selected files and stay under size limits.
